@@ -11,6 +11,16 @@ class Chip8:
     st:int #sound register
     i:int #the I register, generally used for storing address is 16-bits
 
+    def __init__(self, display:Display):
+        self.ram=RAM()
+        self.registers = defaultdict(int)
+        self.display = display
+        self.pc=0
+        self.sp=0
+        self.i=0
+        self.dt=0
+        self.st=0
+
     def execute(self, instruction:str):
         ...
 
