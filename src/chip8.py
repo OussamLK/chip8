@@ -1,6 +1,9 @@
 from __future__ import annotations
 from collections import defaultdict
 import random
+from typing import Union, TypeVar, Generic, Callable
+
+T = TypeVar("T")
 
 CLOCK_FREQUENCY = 500
 
@@ -82,7 +85,7 @@ class Chip8:
             case 0xC, x, _, _:
                 self.RND(x, inst&0xFF)
             case 0xD, x, y, n:
-                self.DRW()
+                self.DRW(x, y, n)
             case 0xE, x, 9, 0xE:
                 raise NotImplementedError
             case 0xE, x, 0xA, 1:
@@ -238,9 +241,10 @@ class Chip8:
         r = random.randrange(2**8) & mask
         self.registers[register_id] = r
 
-    def DRW(self):
+    def DRW(self, x, y, n):
         '''Dxyn'''
-        raise NotImplementedError 
+        sprite:bytearray = bytearray(self.ram[self.i: self.i+n])
+        return self.display.draw_sprite((x, y), sprite)
 
     def SKP(self, register_id, keys_pressed):
         '''Ex9E'''
@@ -309,11 +313,41 @@ class RAM:
     values: defaultdict
     def __init__(self):
         self.values = defaultdict(int)
-    def __getitem__(self, index:int)->int:
-        return self.values[index]
+    def __getitem__(self, index:int | slice)->int:
+        match index:
+            case int(i):
+                return self.values[i]
+            case slice(start=i, stop=j):
+                return self.values[i:j]
+
     def __setitem__(self, index: int, value:int):
         self.values[index] = value
 
 class Display:
+
+    bitmap: Matrix[bool]
+    def __init__(self):
+        self.initialize()
     def clear(self):
-        ...
+        self.initialize()
+    def initialize(self):
+        self.bitmap = Matrix(32, 64, bool) 
+
+    def draw_sprite(self, position:tuple[int, int], sprite:bytearray)->bool:
+        '''draws sprite starting at position, returns collision bool.
+        Does a wrap around if sprite too big.
+        Each bytes is a line in the drawing.'''
+        raise NotImplementedError
+
+class Matrix(Generic[T]):
+    values:list[list[T]]
+    def __init__(self, n:int, m:int, default_factory:Callable[[], T] = int):
+        self.values = [[default_factory() for _ in range(m)] for _ in range(n)]
+    def __getitem__(self, interval:tuple):
+        i, j = interval
+        return self.values[i][j]
+    def __setitem__(self, interval:tuple, value:T):
+        i, j = interval
+        self.values[i][j] = value
+    def __repr__(self)->str:
+        return '\n'.join(''.join(str(e) for e in line) for line in self.values)
