@@ -1,7 +1,7 @@
 from __future__ import annotations
 from collections import defaultdict
 import random
-from typing import Union, TypeVar, Generic, Callable
+from typing import Union, TypeVar, Generic, Callable, Optional
 
 T = TypeVar("T")
 
@@ -326,21 +326,40 @@ class RAM:
 class Display:
 
     bitmap: Matrix[bool]
-    def __init__(self):
+    height: int
+    width: int
+
+    def __init__(self, height=32, width=64):
+        self.height = height
+        self.width = width
         self.initialize()
+    
     def clear(self):
         self.initialize()
+
     def initialize(self):
-        self.bitmap = Matrix(32, 64, bool) 
+        self.bitmap = Matrix(self.height, self.width, bool) 
 
     def draw_sprite(self, position:tuple[int, int], sprite:bytearray)->bool:
         '''draws sprite starting at position, returns collision bool.
         Does a wrap around if sprite too big.
         Each bytes is a line in the drawing.'''
-        raise NotImplementedError
+        overlap = False
+        x, y = position
+        for i, byte in enumerate(sprite):
+            for j, bit in enumerate(bin(byte)[2:].rjust(8,"0")):
+                px, py = (x+i)%self.height, (y+j)%self.width #wraps around the edges (from chip-8 spec)
+                if not overlap and self.bitmap[px, py] and bool(int(bit)):
+                    overlap = True
+                self.bitmap[px, py] ^= bool(int(bit))
+        return overlap
+    def __repr__(self)->str:
+        return self.bitmap.custorm_repr(repr_fun=lambda x: '1' if x else '0')
 
 class Matrix(Generic[T]):
+
     values:list[list[T]]
+    
     def __init__(self, n:int, m:int, default_factory:Callable[[], T] = int):
         self.values = [[default_factory() for _ in range(m)] for _ in range(n)]
     def __getitem__(self, interval:tuple):
@@ -350,4 +369,6 @@ class Matrix(Generic[T]):
         i, j = interval
         self.values[i][j] = value
     def __repr__(self)->str:
-        return '\n'.join(''.join(str(e) for e in line) for line in self.values)
+        return '\n'.join(', '.join(str(e) for e in line) for line in self.values)
+    def custorm_repr(self, repr_fun:Callable[[T],str])->str:
+        return '\n'.join(', '.join(repr_fun(e) for e in line) for line in self.values)
