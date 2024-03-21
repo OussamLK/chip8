@@ -16,20 +16,22 @@ class Console:
     rom_name:str
     rom:bytearray
     clock_count:int
-    def __init__(self):
+    def __init__(self, screen_scaling_factor = 10):
         self.clock_count = 0
+        self.screen_scaling_factor = screen_scaling_factor
         self.display = Display(64, 32)
         self.chip = Chip8(self.display)
         pygame.init() 
-        self.pygame_screen = pygame.display.set_mode((self.display.width, self.display.height))
+        self.pygame_screen = pygame.display.set_mode((self.display.width*screen_scaling_factor, self.display.height*self.screen_scaling_factor))
         pygame.display.set_caption("NO ROM")
         
     def _render_screen(self):
+        sf = self.screen_scaling_factor
         self.pygame_screen.fill(Display.BLACK)
         for x in range(self.display.width):
             for y in range(self.display.height):
                 if self.display.bitmap[y,x]:
-                    self.pygame_screen.set_at((x,y), Display.WHITE)
+                    pygame.draw.rect(self.pygame_screen, Display.WHITE, (x*sf,y*sf, sf, sf))
 
     def load_rom(self, rom_name:str, rom:bytearray):
         self.chip.load_rom(rom)
