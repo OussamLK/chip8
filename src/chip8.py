@@ -3,10 +3,58 @@ from collections import defaultdict
 import random
 from typing import Union, TypeVar, Generic, Callable, Optional
 import json
+import pygame
+import sys
 
 T = TypeVar("T")
 
 CLOCK_FREQUENCY = 500
+
+class Console:
+    chip:Chip8
+    display:Display
+    rom_name:str
+    rom:bytearray
+    clock_count:int
+    def __init__(self):
+        self.clock_count = 0
+        self.display = Display(64, 32)
+        self.chip = Chip8(self.display)
+        pygame.init() 
+        self.pygame_screen = pygame.display.set_mode((self.display.width, self.display.height))
+        pygame.display.set_caption("NO ROM")
+        
+    def _render_screen(self):
+        self.pygame_screen.fill(Display.BLACK)
+        for x in range(self.display.width):
+            for y in range(self.display.height):
+                if self.display.bitmap[y,x]:
+                    self.pygame_screen.set_at((x,y), Display.WHITE)
+
+    def load_rom(self, rom_name:str, rom:bytearray):
+        self.chip.load_rom(rom)
+        pygame.display.set_caption(rom_name)
+
+    def _execute_step(self)->int:
+        '''returns 0 if everything is fine, otherwise returns 1'''
+        self.chip.clock_tick()
+        return 0
+
+    def start(self):
+        running = True
+        self.clock_count  = (self.clock_count + 1) % 8
+        while running:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+            if self._execute_step(): #in case there is an error
+                running = 0
+            if self.clock_count == 0 or True:
+                self._render_screen()
+                pygame.display.flip()
+
+    def __del__(self):
+        pygame.quit()
 
 class Chip8Error(Exception):
     def __init__(self, message):
@@ -134,7 +182,7 @@ class Chip8:
 
 
     def clock_tick(self):
-        current_instruction = self.ram[self.pc]<<8 + self.ram[self.pc+1]
+        current_instruction = (self.ram[self.pc]<<8) + self.ram[self.pc+1] #type: ignore
         self.execute(current_instruction)
         self.pc += 2
         self._clock_counter += 1
@@ -158,7 +206,7 @@ class Chip8:
         '''00EE'''
         if self.sp == 0:
             raise Chip8Error("Stack Pointer at position 0 can not return")
-        self.pc = self.ram[self.sp]
+        self.pc = self.ram[self.sp]#type:ignore
         self.sp -= 1
 
     def JP(self, address):
@@ -326,7 +374,9 @@ class Chip8:
         def ram(offset): return hex(self.ram[self.pc+offset])
         return\
         f"Chip8:-------\n\
-        pc: {hex(self.pc)} --> [ {ram(0)} | {ram(1)} ] || [ {ram(2)} | {ram(2)} ] || ..."
+        pc: {hex(self.pc)} --> [ {ram(0)} | {ram(1)} ] || [ {ram(2)} | {ram(2)} ] || ...\n\
+        registers: i= {hex(self.i)},\n\
+        registers: {', '.join(f'reg{k}= {hex(v)}' for k,v in self.registers.items())}"
 
 
 
@@ -335,12 +385,12 @@ class RAM:
     values: defaultdict
     def __init__(self):
         self.values = defaultdict(int)
-    def __getitem__(self, index:int | slice)->int:
+    def __getitem__(self, index:int | slice)->int | list:
         match index:
             case int(i):
                 return self.values[i]
             case slice(start=i, stop=j):
-                return self.values[i:j]
+                return [self.values[i] for i in range(i,j)]
 
     def __setitem__(self, index: int, value:int):
         self.values[index] = value
@@ -350,8 +400,10 @@ class Display:
     bitmap: Matrix[bool]
     height: int
     width: int
+    BLACK = (0,0,0)
+    WHITE = (255,255,255)
 
-    def __init__(self, height=32, width=64):
+    def __init__(self, width=64, height=32):
         self.height = height
         self.width = width
         self.initialize()
@@ -381,8 +433,12 @@ class Display:
 class Matrix(Generic[T]):
 
     values:list[list[T]]
-    
+    n:int
+    m:int
+
     def __init__(self, n:int, m:int, default_factory:Callable[[], T] = int):
+        self.n = n
+        self.m = m
         self.values = [[default_factory() for _ in range(m)] for _ in range(n)]
     def __getitem__(self, interval:tuple):
         i, j = interval

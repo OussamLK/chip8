@@ -2,14 +2,20 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python Debugger: Module",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "src"
+        },
+        {
             "name": "Python: PyTest",
             "type": "debugpy",
             "request": "launch",
             "module": "pytest",
             "args": [
-                "-v",
+                "-v"
                 // Optionally add arguments here
-            ],
+            ]
         }
     ]
 }
