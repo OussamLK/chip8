@@ -2,6 +2,7 @@ from __future__ import annotations
 from collections import defaultdict
 import random
 from typing import Union, TypeVar, Generic, Callable, Optional
+import json
 
 T = TypeVar("T")
 
@@ -22,6 +23,7 @@ class Chip8:
     st:int #sound register
     i:int #the I register, generally used for storing address is 16-bits
     _clock_counter: int
+    _running: bool
 
     def __init__(self, display:Display):
         self.ram=RAM()
@@ -30,12 +32,31 @@ class Chip8:
         self.initialize()
 
     def initialize(self, pc_position=512):
+        self._running = True
         self.pc=pc_position
         self.sp=0
         self.i=0
         self.dt=0
         self.st=0
         self._clock_counter = 0
+        self.sprites_stating_location = 0x50
+        self._create_sprites(start_location=self.sprites_stating_location)
+
+    def _parse_sprite(self, sprite:str)->bytearray:
+        return bytearray(int(line, base=2) for line in sprite.split('\n'))
+
+    def _create_sprites(self, start_location:int):
+        with open('src/chip8_sprites.json', 'r') as sprite_file:
+            location = start_location
+            json_str = ''.join(sprite_file.readlines())
+            sprites:dict = json.loads(json_str)['sprites']
+            for _, sprite in sprites.items():
+                sprite_byte = bytearray(sprite)
+                for byte in sprite_byte:
+                    self.ram[location] = byte 
+                    location += 1
+
+        
 
     def execute(self, inst:int):
         d4, d3, d2, d1 = (inst&0xF000)>>3*4, (inst&0x0F00)>>2*4, (inst&0x00F0)>>4, inst&0x000F
@@ -262,6 +283,7 @@ class Chip8:
 
     def LDK(self, register_id):
         '''fx0A'''
+        self._running = False
         raise NotImplementedError
     
     def LDRT(self, register_id):
@@ -278,7 +300,7 @@ class Chip8:
     
     def LDS(self, register_id):
         '''fx29, load the location of the sprite represented in register x'''
-        raise NotImplementedError
+        self.i  = self.sprites_stating_location + 5 * self.registers[register_id]
     
     def LDB(self, register_id):
         '''Fx33, store register in ram at I, I+1, I+2 in decimal representation'''

@@ -10,6 +10,9 @@ def mock_display():
 def chip8(mock_display):
     return Chip8(mock_display)
 
+def test_initialization(chip8):
+    ...
+
 def test_cls(chip8):
     chip8.execute(0xE0)
     chip8.display.clear.assert_called_once()
